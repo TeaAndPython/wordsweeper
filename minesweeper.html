@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WordSweeper Fullscreen</title>
+    <style>
+        :root {
+            --color-bg: #121213;
+            --color-tile-bg: #121213;
+            --color-border: #3a3a3c;
+            --color-text: #ffffff;
+            --color-grey: #3a3a3c;
+            --color-yellow: #b59f3b;
+            --color-green: #538d4e;
+            --color-mine: #e04141;
+            --color-flag: #ff9f43;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            min-height: -webkit-fill-available; 
+            width: 100vw;
+            padding: 15px; 
+            overflow-x: hidden;
+        }
+
+        header {
+            border-bottom: 1px solid var(--color-border);
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0 10px 0;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: min(6vw, 1.8rem);
+            font-weight: 700;
+            letter-spacing: 0.12rem;
+        }
+
+        #rules-toggle-btn {
+            background: none;
+            border: none;
+            color: #818384;
+            font-size: min(3.8vw, 0.9rem);
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            padding: 5px;
+            box-shadow: none;
+            width: auto;
+        }
+
+        #rules-toggle-btn:hover {
+            color: var(--color-text);
+        }
+
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 450px;
+            gap: 12px;
+        }
+
+        #stats-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-weight: bold;
+            font-size: min(3.8vw, 0.95rem);
+            color: #818384;
+        }
+
+        #message {
+            font-weight: bold;
+            min-height: 20px;
+            font-size: min(3.8vw, 0.9rem);
+            text-align: center;
+            color: #e04141;
+            width: 100%;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-gap: 6px;
+            width: 100%;
+            max-width: min(100%, 75vw, 50vh); 
+            aspect-ratio: 1 / 1;
+            margin: 5px 0 15px 0;
+        }
+
+        .tile {
+            background-color: var(--color-tile-bg);
+            border: 2px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: min(7.5vw, 1.8rem);
+            font-weight: bold;
+            user-select: none;
+            cursor: pointer;
+            position: relative;
+            border-radius: 4px;
+            transition: background-color 0.15s, border-color 0.15s;
+        }
+
+        .tile .count {
+            font-size: min(3vw, 0.8rem);
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            opacity: 0.85;
+        }
+
+        .tile.revealed-grey {
+            background-color: var(--color-grey);
+            border-color: var(--color-grey);
+        }
+
+        .tile.revealed-yellow {
+            background-color: var(--color-yellow);
+            border-color: var(--color-yellow);
+        }
+
+        .tile.flagged {
+            border-color: var(--color-flag);
+            background-color: #2c2519;
+        }
+
+        .tile.flagged::before {
+            content: "🚩";
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: min(3.5vw, 0.8rem);
+        }
+
+        .tile.mine-exploded {
+            background-color: var(--color-mine);
+            border-color: var(--color-mine);
+        }
+
+        .tile.victory-green {
+            background-color: var(--color-green);
+            border-color: var(--color-green);
+        }
+
+        #controls {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 450px;
+            margin-top: auto; /* Pushes layout controls to bottom if space permits */
+            padding-top: 15px;
+        }
+
+        button {
+            flex: 1;
+            background-color: #818384;
+            color: white;
+            border: none;
+            padding: 14px 10px;
+            font-size: min(3.8vw, 0.95rem);
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        button.active-mode {
+            background-color: var(--color-flag);
+        }
+
+        #submit-btn {
+            background-color: var(--color-green);
+        }
+
+        /* Modals and Overlays */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            display: none; 
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background-color: #1e1e20;
+            border: 2px solid var(--color-border);
+            border-radius: 12px;
+            padding: 25px;
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .modal-content h2 {
+            font-size: 1.3rem;
+            color: var(--color-green);
+        }
+
+        .rules-body {
+            text-align: left;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: #d7dadc;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .rules-body strong {
+            color: #ffffff;
+        }
+
+        #modal-restart-btn, #rules-close-btn {
+            background-color: var(--color-green);
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+        }
+
+        #rules-close-btn {
+            background-color: #818384;
+        }
+
+        #reveal-word-box {
+            font-weight: bold;
+            font-size: 1.25rem;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.05rem;
+        }
+
+        .credit-text {
+            font-size: 0.8rem;
+            color: #818384;
+            letter-spacing: 0.02rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="width: 60px;"></div> 
+        <h1>WORDSWEEPER</h1>
+        <button id="rules-toggle-btn" onclick="showRules()">Rules ℹ️</button>
+    </header>
+
+    <div id="main-container">
+        <div id="stats-container">
+            <div id="flags-count">FLAGS NEEDED: 0</div>
+            <div id="status-msg">FIND THE SECRET WORD</div>
+        </div>
+
+        <div id="message"></div>
+
+        <div id="grid"></div>
+    </div>
+
+    <div id="controls">
+        <button id="mode-btn" onclick="toggleMode()">Mode: Dig ⛏️</button>
+        <button id="submit-btn" onclick="checkWinCondition()">Submit Word 🟢</button>
+    </div>
+
+    <!-- How to Play Rules -->
+    <div id="rules-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <h2>How to Play</h2>
+            <div class="rules-body">
+                <p>🎯 <strong>Objective:</strong> Locate and flag all unique letters that make up the hidden 5-letter secret word.</p>
+                <p>⛏️ <strong>Dig Mode:</strong> Left-click tiles to uncover them safely. Uncovered safe tiles turn grey or yellow.</p>
+                <p>🟨 <strong>Yellow Tiles:</strong> The number reveals how many hidden <em>secret word letters</em> touch that specific tile (including diagonals).</p>
+                <p>🚩 <strong>Flag Mode:</strong> Right-click anywhere (or click the Mode button to use left-click) to plant flags on secret letters.</p>
+                <p>💥 <strong>Danger:</strong> Digging into a letter that belongs to the secret word triggers an immediate explosion and game over.</p>
+            </div>
+            <button id="rules-close-btn" onclick="hideRules()">Let's Play 🎮</button>
+        </div>
+    </div>
+
+    <!-- Game Over Status (Reordered Layout) -->
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div id="reveal-word-box"></div>
+            <button id="modal-restart-btn" onclick="initGame()">Play Again 🔄</button>
+            <div class="credit-text">Made by TeaAndPython</div>
+        </div>
+    </div>
+
+<script>
+    const WORD_LIST = [
+        "ABOUT", "ABOVE", "ACTOR", "ACUTE", "ADMIT", "ADOPT", "ADULT", "AFTER", "AGAIN", "AGENT",
+        "AHEAD", "AISLE", "ALARM", "ALBUM", "ALERT", "ALIVE", "ALONG", "ALOUD", "ALTER", "AMBER", 
+        "AMONG", "AMPLE", "ANGEL", "ANGER", "ANGLE", "ANGRY", "ANIME", "ANKLE", "APPLY", "ARGUE", 
+        "AROMA", "ARROW", "ASIDE", "ASSET", "AUDIO", "AWAKE", "BADGE", "BAKER", "BANJO", "BARGE", 
+        "BASIC", "BASIS", "BATCH", "BEACH", "BEARD", "BEAST", "BEGIN", "BELOW", "BENCH", "BERTH", 
+        "BINGO", "BLACK", "BLADE", "BLAME", "BLANK", "BLAST", "BLAZE", "BLEND", "BLIND", "BLINK", 
+        "BLISS", "BLOCK", "BLOND", "BLOOD", "BLOOM", "BLOWN", "BLUES", "BLUNT", "BLURB", "BLUSH", 
+        "BOARD", "BOAST", "BONGO", "BONUS", "BOOST", "BOUND", "BOWEL", "BRAID", "BRAIN", "BRAKE", 
+        "BRAND", "BRASH", "BRASS", "BRAVE", "BREAD", "BREAK", "BRIBE", "BRICK", "BRIDE", "BRIEF", 
+        "BRING", "BRISK", "BROAD", "BROKE", "BROOK", "BROOM", "BROWN", "BRUNT", "BRUSH", "BRUTE", 
+        "BUILD", "BUILT", "BUNCH", "BURNT", "BUYER", "CABIN", "CABLE", "CAMEL", "CANAL", "CANDY", 
+        "CANOE", "CARGO", "CAROL", "CARVE", "CATER", "CAUSE", "CHAIR", "CHALK", "CHAMP", "CHANT", 
+        "CHAOS", "CHARM", "CHART", "CHASE", "CHEAP", "CHEAT", "CHECK", "CHEEK", "CHEER", "CHEST", 
+        "CHILD", "CHILL", "CHIME", "CHIPS", "CHOIR", "CHORD", "CHORE", "CHUCK", "CHUMP", "CHUNK", 
+        "CHURN", "CHUTE", "CIDER", "CIGAR", "CLAIM", "CLAMP", "CLANG", "CLANK", "CLASH", "CLASP", 
+        "CLEAN", "CLEAR", "CLEFT", "CLERK", "CLICK", "CLIFF", "CLIMB", "CLING", "CLINK", "CLOAK", 
+        "CLOCK", "CLONE", "CLOSE", "CLOTH", "CLOUD", "CLOVE", "CLOWN", "CLUCK", "CLUMP", "CLUNG", 
+        "COACH", "COAST", "COBRA", "COCOA", "COMET", "COMIC", "COMMA", "CONCH", "CORAL", "COUCH", 
+        "COUGH", "COUNT", "COUPE", "COURT", "COVER", "COVET", "COWER", "CRACK", "CRAFT", "CRAMP", 
+        "CRANE", "CRANK", "CRASH", "CRATE", "CRAVE", "CRAWL", "CRAZE", "CRAZY", "CREAK", "CREAM", 
+        "CREED", "CREEK", "CREST", "CRIME", "CRIMP", "CRISP", "CROCK", "CRONE", "CRONY", "CROOK", 
+        "CROSS", "CROWD", "CROWN", "CRUDE", "CRUEL", "CRUMB", "CRUMP", "CRUSH", "CRUST", "CRYPT", 
+        "CUBIC", "CURLY", "CURSE", "CURVE", "CYNIC", "DAILY", "DAIRY", "DAISY", "DANCE", "DANDY", 
+        "DEBIT", "DEBRIS", "DEBUT", "DECAL", "DECAY", "DECOR", "DECOY", "DEFER", "DEFY", "DEITY", 
+        "DELAY", "DELTA", "DELVE", "DENIM", "DENSE", "DEPOT", "DEPTH", "DERBY", "DEVIL", "DIARY", 
+        "DIESEL", "DIET", "DIGIT", "DINER", "DINGO", "DINGY", "DIVAN", "DIZZY", "DOCK", "DODGE", 
+        "DOGMA", "DOILY", "DOLLAR", "DONATE", "DONOR", "DOUBT", "DOUGH", "DOUSE", "DOZEN", 
+        "DRAFT", "DRAIN", "DRAKE", "DRAMA", "DRANK", "DRAPE", "DRAWL", "DREAD", "DREAM", 
+        "DRESS", "DRIFT", "DRILL", "DRINK", "DRIVE", "DROLL", "DRONE", "DROOL", "DROOP", 
+        "DROSS", "DROVE", "DROWN", "DRUG", "DRUM", "DRUNK", "DUCAL", "DUCAT", "DUCHY", 
+        "DUEL", "DUET", "DUKE", "DULLARD", "DUMMY", "DUNCE", "DUPLEX", "DUSKY", "DUSTY", 
+        "DUTY", "DWARF", "DWELL", "DWELT", "DYING", "EAGER", "EAGLE", "EARLY", "EARTH", 
+        "EARTHY", "EASEL", "EAVES", "EBONY", "ECHO", "EDICT", "EDIFY", "EDOCLE", "EERIE", 
+        "EIGHT", "EIGHTY", "EJECT", "ELBOW", "ELDER", "ELECT", "ELEGY", "ELOPE", "ELUDE", 
+        "ELUSIVE", "EMBER", "EMPTY", "ENACT", "ENDOW", "ENDURE", "ENEMY", "ENJOY", "ENLIST", 
+        "ENMITY", "ENOUGH", "ENRAGE", "ENRICH", "ENROLL", "ENSUE", "ENSURE", "ENTER", "ENTRY", 
+        "ENVY", "EPIC", "EPOCH", "EQUAL", "EQUATE", "EQUIP", "EQUITY", "ERASE", "ERASER", 
+        "ERECT", "ERMINE", "ERODE", "ERRAND", "ERROR", "ERUPT", "ESCAPE", "ESCROW", "ESSAY", 
+        "ESTATE", "ESTEEM", "ETHER", "ETHIC", "ETHNIC", "EVADE", "EVENT", "EVERY", "EVICT", 
+        "EVIL", "EVOKE", "EVOLVE", "EXACT", "EXALT", "EXCEL", "EXCEPT", "EXCESS", "EXCITE", 
+        "EXCUSE", "EXEMPT", "EXERT", "EXHALE", "EXILE", "EXIST", "EXIT", "EXODUS", "EXOTIC", "EXPAND", 
+        "EXPECT", "EXPEL", "EXPERT", "EXPIRE", "EXPORT", "EXPOSE", "EXTEND", "EXTENT", "EXTOL", 
+        "EXTRA", "EXULT", "FABLE", "FABRIC", "FACET", "FACING", "FACTOR", "FAINT", "FAIRY", 
+        "FAITH", "FAKE", "FAKIR", "FALCON", "FALSE", "FALTER", "FAMINE", "FAMISH", "FAMOUS", 
+        "FANCY", "FANG", "FANTASY", "FARCE", "FARMER", "FASTEN", "FATAL", "FATED", "FATHER", 
+        "FATHOM", "FAUCET", "FAULT", "FAULTY", "FAVOR", "FAWN", "FEALTY", "FEAR", "FEAST", 
+        "FEATHER", "FEATURE", "FEEBLE", "FEELING", "FEIGN", "FEINT", "FELINE", "FELLOW", 
+        "FELON", "FELONY", "FEMALE", "FENCE", "FENDER", "FERMENT", "FERRET", "FERRY", "FERTILE", 
+        "FERVENT", "FERVID", "FERVOR", "FESTAL", "FESTER", "FETCH", "FETID", "FETISH", "FETTER", 
+        "FETUS", "FEUDAL", "FEVER", "FIBER", "FIBULA", "FICKLE", "FIDDLE", "FIELD", "FIEND", 
+        "FIERCE", "FIERY", "FIFTY", "FIGHT", "FIGURE", "FILCH", "FILIAL", "FILING", "FILLET", 
+        "FILMY", "FILTER", "FILTH", "FILTHY", "FINAL", "FINALE", "FINCH", "FINERY", "FINESSE", 
+        "FINGER", "FINISH", "FINITE", "FIORD", "FIREFLY", "FIREMAN", "FIRST", "FISCAL", 
+        "FLABBY", "FLAIL", "FLAIR", "FLAKE", "FLAKY", "FLANGE", "FLANK", "FLAP", "FLARE", 
+        "FLASH", "FLASHY", "FLASK", "FLAW", "FLAX", "FLEA", "FLECK", "FLEECE", "FLEECY", 
+        "FLEET", "FLESH", "FLESHY", "FLIGHT", "FLIMSY", "FLINCH", "FLING", "FLINT", "FLIP", 
+        "FLIRT", "FLOAT", "FLOCK", "FLOOD", "FLOOR", "FLOP", "FLORA", "FLORAL", "FLORID", 
+        "FLORIN", "FLORIST", "FLOSS", "FLOUR", "FLOUT", "FLOWER", "FLOWN", "FLUENCY", "FLUENT", 
+        "FLUFF", "FLUFFY", "FLUID", "FLUKE", "FLUME", "FLUNG", "FLURRY", "FLUSH", "FLUTE", 
+        "FLUX", "FLYING", "FOAMY", "FOCUS", "FODDER", "FOIBLE", "FOIL", "FOIST", "FOLDER", 
+        "FOLIO", "FOLLY", "FOMENT", "FONDLE", "FORAGE", "FORCE", "FORECAST", "FOREIGN", "FOREMAN", 
+        "FOREST", "FOREVER", "FORFEIT", "FORGAVE", "FORGE", "FORGET", "FORGIVE", "FORGO", "FORK", 
+        "FORMAL", "FORMAT", "FORMER", "FORUM", "FORWARD", "FOSSIL", "FOSTER", "FOUGHT", "FOUND", 
+        "FOUNT", "FOYER", "FRAIL", "FRAME", "FRANC", "FRANK", "FRAUD", "FRAY", "FREAK", 
+        "FREEDOM", "FREEZE", "FRENCH", "FRENZY", "FRESCO", "FRESH", "FRETFUL", "FRIAR", "FRIDAY", 
+        "FRIEND", "FRIEZE", "FRIGID", "FRINGE", "FRISK", "FRISKY", "FRITTER", "FRIZZ", "FROCK", 
+        "FROLIC", "FROND", "FRONT", "FROST", "FROSTY", "FROTH", "FROWZY", "FROZEN", "FRUGAL", 
+        "FRUIT", "FUCHSIA", "FUDGE", "FUGITIVE", "FULCRUM", "FULFILL", "FULLER", "FULLY", 
+        "FUMBLE", "FUMIGATE", "FUNCTION", "FUNERAL", "FUNNY", "FURBISH", "FURIOUS", "FURLONG", 
+        "FURROW", "FURRY", "FURTHER", "FURTIVE", "FUTURE", "FUZZY"
+    ];
+
+    const GRID_SIZE = 5;
+    const FULL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+
+    let SECRET_WORD = "";
+    let UNIQUE_WORD_LETTERS = []; 
+    let board = [];
+    let isFlagMode = false;
+    let gameOver = false;
+    let flaggedCount = 0;
+
+    const gridElement = document.getElementById('grid');
+    const messageElement = document.getElementById('message');
+    const flagsCountElement = document.getElementById('flags-count');
+    const modeBtn = document.getElementById('mode-btn');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const rulesOverlay = document.getElementById('rules-overlay');
+    const revealWordBox = document.getElementById('reveal-word-box');
+
+    function initGame() {
+        gameOver = false;
+        isFlagMode = false;
+        flaggedCount = 0;
+        board = [];
+        
+        modalOverlay.style.display = "none";
+
+        SECRET_WORD = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+        UNIQUE_WORD_LETTERS = [...new Set(SECRET_WORD.split(''))];
+
+        messageElement.innerText = "";
+        flagsCountElement.innerText = `FLAGS NEEDED: ${UNIQUE_WORD_LETTERS.length}`;
+        document.getElementById('status-msg').innerText = "FIND THE SECRET WORD";
+        modeBtn.innerText = "Mode: Dig ⛏️";
+        modeBtn.classList.remove('active-mode');
+
+        let availableLetters = FULL_ALPHABET.filter(letter => !UNIQUE_WORD_LETTERS.includes(letter));
+        
+        for (let i = availableLetters.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [availableLetters[i], availableLetters[j]] = [availableLetters[j], availableLetters[i]];
+        }
+
+        let neededFillerSize = (GRID_SIZE * GRID_SIZE) - UNIQUE_WORD_LETTERS.length;
+        let finalFiller = availableLetters.slice(0, neededFillerSize);
+        
+        let allTiles = [...UNIQUE_WORD_LETTERS, ...finalFiller];
+        
+        for (let i = allTiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allTiles[i], allTiles[j]] = [allTiles[j], allTiles[i]];
+        }
+
+        let index = 0;
+        for (let r = 0; r < GRID_SIZE; r++) {
+            board[r] = [];
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let letter = allTiles[index++];
+                board[r][c] = {
+                    row: r,
+                    col: c,
+                    letter: letter,
+                    isMine: UNIQUE_WORD_LETTERS.includes(letter),
+                    isRevealed: false,
+                    isFlagged: false,
+                    neighborMines: 0,
+                    element: null
+                };
+            }
+        }
+
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                if (!board[r][c].isMine) {
+                    board[r][c].neighborMines = countAdjacentMines(r, c);
+                }
+            }
+        }
+
+        renderBoard();
+    }
+
+    function countAdjacentMines(r, c) {
+        let count = 0;
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                let newR = r + i;
+                let newC = c + j;
+                if (newR >= 0 && newR < GRID_SIZE && newC >= 0 && newC < GRID_SIZE) {
+                    if (board[newR][newC].isMine) count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    function renderBoard() {
+        gridElement.innerHTML = '';
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const tile = board[r][c];
+                const tileEl = document.createElement('div');
+                tileEl.classList.add('tile');
+                tileEl.innerText = tile.letter;
+                
+                tileEl.addEventListener('click', () => handleTileClick(r, c, false));
+                
+                tileEl.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); 
+                    handleTileClick(r, c, true);
+                });
+                
+                tile.element = tileEl;
+                gridElement.appendChild(tileEl);
+            }
+        }
+    }
+
+    function toggleMode() {
+        if (gameOver) return;
+        isFlagMode = !isFlagMode;
+        if (isFlagMode) {
+            modeBtn.innerText = "Mode: Flag 🚩";
+            modeBtn.classList.add('active-mode');
+        } else {
+            modeBtn.innerText = "Mode: Dig ⛏️";
+            modeBtn.classList.remove('active-mode');
+        }
+    }
+
+    function handleTileClick(r, c, forceFlag) {
+        if (gameOver) return;
+        let tile = board[r][c];
+
+        if (isFlagMode || forceFlag) {
+            if (tile.isRevealed) return;
+            
+            if (tile.isFlagged) {
+                tile.isFlagged = false;
+                tile.element.classList.remove('flagged');
+                flaggedCount--;
+            } else {
+                if (flaggedCount >= UNIQUE_WORD_LETTERS.length) {
+                    showMessage(`You only need to flag ${UNIQUE_WORD_LETTERS.length} unique letters!`);
+                    return;
+                }
+                tile.isFlagged = true;
+                tile.element.classList.add('flagged');
+                flaggedCount++;
+            }
+            flagsCountElement.innerText = `FLAGS PLACED: ${flaggedCount} / ${UNIQUE_WORD_LETTERS.length}`;
+        } else {
+            if (tile.isRevealed || tile.isFlagged) return;
+
+            if (tile.isMine) {
+                tile.isRevealed = true;
+                tile.element.classList.add('mine-exploded');
+                endGame(false, `BOOM! You clicked '${tile.letter}', part of the word.`);
+                return;
+            }
+
+            revealTile(r, c);
+        }
+    }
+
+    function revealTile(r, c) {
+        let tile = board[r][c];
+        if (tile.isRevealed || tile.isFlagged || tile.isMine) return;
+
+        tile.isRevealed = true;
+
+        if (tile.neighborMines > 0) {
+            tile.element.classList.add('revealed-yellow');
+            
+            let countEl = document.createElement('span');
+            countEl.classList.add('count');
+            countEl.innerText = tile.neighborMines;
+            tile.element.appendChild(countEl);
+        } else {
+            tile.element.classList.add('revealed-grey');
+            
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    let newR = r + i;
+                    let newC = c + j;
+                    if (newR >= 0 && newR < GRID_SIZE && newC >= 0 && newC < GRID_SIZE) {
+                        revealTile(newR, newC);
+                    }
+                }
+            }
+        }
+    }
+
+    function checkWinCondition() {
+        if (gameOver) return;
+
+        let correctlyFlagged = 0;
+        let totalFlagsPlaced = 0;
+
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                if (board[r][c].isFlagged) {
+                    totalFlagsPlaced++;
+                    if (board[r][c].isMine) {
+                        correctlyFlagged++;
+                    }
+                }
+            }
+        }
+
+        if (totalFlagsPlaced !== UNIQUE_WORD_LETTERS.length) {
+            showMessage(`Flag exactly ${UNIQUE_WORD_LETTERS.length} letters before submitting!`);
+            return;
+        }
+
+        if (correctlyFlagged === UNIQUE_WORD_LETTERS.length) {
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (board[r][c].isMine) {
+                        board[r][c].element.className = "tile victory-green";
+                    }
+                }
+            }
+            endGame(true, "SUCCESS! You flagged all correct letters!");
+        } else {
+            endGame(false, "Defeated! Your flags missed the target letters.");
+        }
+    }
+
+    function showMessage(text) {
+        messageElement.innerText = text;
+        setTimeout(() => {
+            if (!gameOver && messageElement.innerText === text) messageElement.innerText = "";
+        }, 3000);
+    }
+
+    function showRules() {
+        rulesOverlay.style.display = "flex";
+    }
+
+    function hideRules() {
+        rulesOverlay.style.display = "none";
+    }
+
+    function endGame(won, msg) {
+        gameOver = true;
+        messageElement.innerText = msg;
+        document.getElementById('status-msg').innerText = won ? "YOU WIN! 🎉" : "GAME OVER ❌";
+        
+        revealWordBox.innerText = `The word is ${SECRET_WORD}`;
+        modalOverlay.style.display = "flex";
+        
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let tile = board[r][c];
+                if (!tile.isRevealed && !tile.isFlagged) {
+                    if (tile.isMine && !won) {
+                        tile.element.style.borderColor = "var(--color-mine)";
+                    } else if (!tile.isMine) {
+                        tile.element.style.opacity = "0.4";
+                    }
+                }
+            }
+        }
+    }
+
+    initGame();
+    showRules();
+</script>
+</body>
+</html>
